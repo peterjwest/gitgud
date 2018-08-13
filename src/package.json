@@ -1,0 +1,5 @@
+{
+  "name": "gitgud",
+  "private": true,
+  "main": "server.js"
+}
