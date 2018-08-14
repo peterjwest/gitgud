@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "outDir": "build",
+    "rootDir": "src",
+    "lib": ["es6", "dom"],
+    "sourceMap": true,
+    "module": "commonjs",
+    "jsx": "react",
+    "jsxFactory": "h",
+    "target": "es5",
+    "experimentalDecorators": true,
+    "moduleResolution": "node",
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "strictNullChecks": true,
+    "alwaysStrict": true,
+    "allowJs": true,
+    "typeRoots": ["./node_modules/@types/", "./src/types/external.d.ts"],
+    "baseUrl": "."
+  },
+  "include": [
+    "src/**/*"
+  ]
+}
