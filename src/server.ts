@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Menu, shell, dialog, webContents } from 'electron';
-import { ipcMain } from 'electron';
+import { ipcMain, Event } from 'electron';
 import * as defaultMenu from 'electron-default-menu';
 import * as nodegit from 'nodegit';
 
@@ -44,7 +44,7 @@ app.on('ready', () => {
   Menu.setApplicationMenu(menu);
 });
 
-ipcMain.on('stage', async (event: { sender: webContents }, file: File) => {
+ipcMain.on('stage', async (event: Event, file: File) => {
   const windowData = webContentsMap.get(event.sender);
   if (!windowData || !windowData.repo) {
     throw new Error('Repository not loaded');
@@ -57,19 +57,19 @@ ipcMain.on('stage', async (event: { sender: webContents }, file: File) => {
     await index.addByPath(file.path);
   }
 
-  await <any> index.write();
+  await index.write() as any;
   await index.writeTree();
   event.sender.send('status', { files: await getGitStatus(windowData.repo) });
 });
 
-ipcMain.on('unstage', async(event: { sender: webContents }, file: File) => {
+ipcMain.on('unstage', async(event: Event, file: File) => {
   const windowData = webContentsMap.get(event.sender);
   if (!windowData || !windowData.repo) {
     throw new Error('Repository not loaded');
   }
 
   const commit = await windowData.repo.getHeadCommit();
-  await nodegit.Reset.default(windowData.repo, <any> commit, [file.path]);
+  await nodegit.Reset.default(windowData.repo, commit as any, [file.path]);
   const index = await windowData.repo.refreshIndex();
   await index.writeTree();
   event.sender.send('status', { files: await getGitStatus(windowData.repo) });

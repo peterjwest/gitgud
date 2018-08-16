@@ -6,6 +6,7 @@ import * as ReactDOM from 'react-dom';
 import { createStore, applyMiddleware } from 'redux';
 import { Provider } from 'react-redux';
 import thunk from 'redux-thunk';
+import { Event } from 'electron';
 
 import reducer, { Store, FileStatus, AppAction } from './reducer';
 import { connect, ActionProps } from './connect';
@@ -31,11 +32,11 @@ class App extends React.Component<AppProps, AppState> {
   constructor(props: AppProps) {
     super(props);
 
-    ipcRenderer.on('init', (event: any, data: {path: string, branch: string}) => {
+    ipcRenderer.on('init', (event: Event, data: {path: string, branch: string}) => {
       this.props.dispatch({ type: 'UPDATE_REPO', name: path.basename(data.path), branch: data.branch });
     });
 
-    ipcRenderer.on('status', (event: any, data: { files: FileStatus[] }) => {
+    ipcRenderer.on('status', (event: Event, data: { files: FileStatus[] }) => {
       this.props.dispatch({ type: 'UPDATE_STATUS', files: data.files });
     });
   }
