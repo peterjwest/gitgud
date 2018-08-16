@@ -19,6 +19,8 @@ const IS_STAGED = (
 );
 
 interface AppStoreProps {
+  name: string;
+  branch: string;
   files: FileStatus[];
 }
 
@@ -30,12 +32,18 @@ class App extends React.Component<AppProps, AppState> {
     super(props);
 
     ipcRenderer.on('init', (event: any, data: {path: string, branch: string}) => {
-      document.title = `${path.basename(data.path)} (${data.branch || 'Branch does not exist yet'})`;
+      this.props.dispatch({ type: 'UPDATE_REPO', name: path.basename(data.path), branch: data.branch });
     });
 
     ipcRenderer.on('status', (event: any, data: { files: FileStatus[] }) => {
       this.props.dispatch({ type: 'UPDATE_STATUS', files: data.files });
     });
+  }
+
+  componentWillReceiveProps(nextProps: AppProps) {
+    if (nextProps.name !== this.props.name || nextProps.branch !== this.props.branch) {
+      document.title = nextProps.name ? `${nextProps.name} (${nextProps.branch || 'Branch does not exist yet'})` : 'Gitgud';
+    }
   }
 
   stageFile(file: FileStatus) {
@@ -73,6 +81,8 @@ class App extends React.Component<AppProps, AppState> {
 
 const AppContainer = connect(App, (store: Store): AppStoreProps => {
   return {
+    name: store.name || '',
+    branch: store.branch || '',
     files: store.status.files,
   };
 });
