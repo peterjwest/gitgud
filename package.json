@@ -6,7 +6,8 @@
   "license": "MIT",
   "scripts": {
     "start": "electron dist/",
-    "build": "webpack"
+    "build": "webpack",
+    "lint-ts": "tslint --project tsconfig.json"
   },
   "devDependencies": {
     "@types/electron": "1.6.10",
