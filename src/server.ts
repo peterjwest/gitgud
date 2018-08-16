@@ -57,7 +57,7 @@ ipcMain.on('stage', async (event: { sender: webContents }, file: File) => {
     await index.addByPath(file.path);
   }
 
-  await index.write();
+  await <any> index.write();
   await index.writeTree();
   event.sender.send('status', { files: await getGitStatus(windowData.repo) });
 });
@@ -134,13 +134,13 @@ function getWindow(path: string, windowClosed: (path: string) => void) {
 async function getGitStatus(repo: nodegit.Repository) {
   const files: File[] = [];
   await nodegit.Status.foreach(repo, (path: string, status: number) => {
-    files.push({path: path, status: status});
+    files.push({ path: path, status: status });
   });
   return files.filter((file) => file.status !== nodegit.Status.STATUS.IGNORED);
 }
 
 function openRepo() {
-  dialog.showOpenDialog({properties: ['openDirectory']}, (folders) => {
+  dialog.showOpenDialog({ properties: ['openDirectory'] }, (folders) => {
     if (folders) {
       createWindow(folders[0]);
     }

@@ -18,7 +18,7 @@
     "comment-format": [true, "check-space"],
     "curly": true,
     "eofline": true,
-    // "forin": true,
+    "forin": true,
     "indent": [true, "spaces"],
     "import-spacing": true,
     "jsdoc-format": true,
@@ -33,8 +33,7 @@
     "no-shadowed-variable": true,
     "no-trailing-whitespace": true,
     "no-var-keyword": true,
-    // Disabled until tslint-eslint-rules supports objectsInObjects
-    // "object-curly-spacing": [true, "always", { "objectsInObjects": false }],
+    "object-curly-spacing": [true, "always", { "objectsInObjects": false }],
     "object-literal-shorthand": [true, "never"],
     "one-variable-per-declaration": [true, "ignore-for-loop"],
     "quotemark": [true, "single", "jsx-double"],
