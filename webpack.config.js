@@ -47,7 +47,7 @@ module.exports = [
     mode: 'production',
     target: 'electron-renderer',
     devtool: 'source-map',
-    entry: ['./src/app/index.ts'],
+    entry: ['./src/app/index.tsx'],
     output: {
       path: path.resolve(__dirname, 'dist/app'),
       publicPath: '/',
