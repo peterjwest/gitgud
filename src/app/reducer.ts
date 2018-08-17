@@ -20,23 +20,23 @@ export const defaultStore: Store = {
 };
 
 export default (store = defaultStore, action: AppAction): Store => {
-  if (action.type === 'UPDATE_REPO') {
+  if (action.type === 'UpdateRepoAction') {
     return { ...store, name: action.name, branch: action.branch };
   }
-  if (action.type === 'UPDATE_STATUS') {
+  if (action.type === 'UpdateStatusAction') {
     return { ...store, status: { ...store.status, files: action.files }};
   }
   return store;
 };
 
 export interface UpdateRepoAction {
-  type: 'UPDATE_REPO';
+  type: 'UpdateRepoAction';
   name: string;
   branch: string;
 }
 
 export interface UpdateStatusAction {
-  type: 'UPDATE_STATUS';
+  type: 'UpdateStatusAction';
   files: FileStatus[];
 }
 

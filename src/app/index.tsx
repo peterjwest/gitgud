@@ -33,11 +33,11 @@ class App extends React.Component<AppProps, AppState> {
     super(props);
 
     ipcRenderer.on('init', (event: Event, data: {path: string, branch: string}) => {
-      this.props.dispatch({ type: 'UPDATE_REPO', name: path.basename(data.path), branch: data.branch });
+      this.props.dispatch({ type: 'UpdateRepoAction', name: path.basename(data.path), branch: data.branch });
     });
 
     ipcRenderer.on('status', (event: Event, data: { files: FileStatus[] }) => {
-      this.props.dispatch({ type: 'UPDATE_STATUS', files: data.files });
+      this.props.dispatch({ type: 'UpdateStatusAction', files: data.files });
     });
   }
 
