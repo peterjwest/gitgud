@@ -122,8 +122,10 @@ function removeWindow(path: string) {
 function getWindow(path: string, windowClosed: (path: string) => void) {
   const window = new BrowserWindow({
     title: '',
-    width: 800,
-    height: 600,
+    width: 1024,
+    height: 768,
+    minHeight: 480,
+    minWidth: 640,
   });
 
   const windowData: WindowData = {
