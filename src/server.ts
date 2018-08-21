@@ -3,6 +3,10 @@ import { ipcMain, Event } from 'electron';
 import * as defaultMenu from 'electron-default-menu';
 import * as nodegit from 'nodegit';
 
+function emptyTreeId() {
+  return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+}
+
 interface File {
   path: string;
   status: number;
@@ -44,6 +48,31 @@ app.on('ready', () => {
   Menu.setApplicationMenu(menu);
 });
 
+const untrackedFlags = (
+  nodegit.Diff.OPTION.SHOW_UNTRACKED_CONTENT |
+  nodegit.Diff.OPTION.INCLUDE_UNTRACKED |
+  nodegit.Diff.OPTION.RECURSE_UNTRACKED_DIRS
+);
+
+
+ipcMain.on('diff', async (event: Event, file: File, staged: boolean) => {
+  const windowData = webContentsMap.get(event.sender);
+  if (!windowData || !windowData.repo) {
+    throw new Error('Repository not loaded');
+  }
+
+  const diff = await getFileDiff(windowData.repo, file, staged);
+  event.sender.send('diff', { diff: diff });
+});
+
+ipcMain.on('status', async (event: Event, file: File) => {
+  const windowData = webContentsMap.get(event.sender);
+  if (!windowData || !windowData.repo) {
+    throw new Error('Repository not loaded');
+  }
+  event.sender.send('status', { files: await getGitStatus(windowData.repo) });
+});
+
 ipcMain.on('stage', async (event: Event, file: File) => {
   const windowData = webContentsMap.get(event.sender);
   if (!windowData || !windowData.repo) {
@@ -57,8 +86,9 @@ ipcMain.on('stage', async (event: Event, file: File) => {
     await index.addByPath(file.path);
   }
 
-  await index.write() as any;
+  await (index.write() as any);
   await index.writeTree();
+
   event.sender.send('status', { files: await getGitStatus(windowData.repo) });
 });
 
@@ -72,6 +102,7 @@ ipcMain.on('unstage', async(event: Event, file: File) => {
   await nodegit.Reset.default(windowData.repo, commit as any, [file.path]);
   const index = await windowData.repo.refreshIndex();
   await index.writeTree();
+
   event.sender.send('status', { files: await getGitStatus(windowData.repo) });
 });
 
@@ -129,6 +160,20 @@ function getWindow(path: string, windowClosed: (path: string) => void) {
   window.on('closed', () => windowClosed(path));
 
   return windowData;
+}
+
+async function getFileDiff(repo: nodegit.Repository, file: File, staged: boolean) {
+  const index = await repo.refreshIndex();
+  if (staged) {
+    const head = await repo.getHeadCommit();
+    const tree = head ? await head.getTree() : await nodegit.Tree.lookup(repo, emptyTreeId());
+    const diff = await nodegit.Diff.treeToIndex(repo, tree, index, { flags: untrackedFlags, pathspec: [file.path] });
+    return await diff.toBuf(nodegit.Diff.FORMAT.PATCH);
+  }
+  else {
+    const diff = await nodegit.Diff.indexToWorkdir(repo, index, { flags: untrackedFlags, pathspec: [file.path] });
+    return await diff.toBuf(nodegit.Diff.FORMAT.PATCH);
+  }
 }
 
 async function getGitStatus(repo: nodegit.Repository) {

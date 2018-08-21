@@ -23,6 +23,7 @@ interface AppStoreProps {
   name: string;
   branch: string;
   files: FileStatus[];
+  diff?: string;
 }
 
 interface AppProps extends AppStoreProps, ActionProps<AppAction> {}
@@ -32,12 +33,16 @@ class App extends React.Component<AppProps, AppState> {
   constructor(props: AppProps) {
     super(props);
 
-    ipcRenderer.on('init', (event: Event, data: {path: string, branch: string}) => {
+    ipcRenderer.on('init', (event: Event, data: { path: string, branch: string }) => {
       this.props.dispatch({ type: 'UpdateRepoAction', name: path.basename(data.path), branch: data.branch });
     });
 
     ipcRenderer.on('status', (event: Event, data: { files: FileStatus[] }) => {
       this.props.dispatch({ type: 'UpdateStatusAction', files: data.files });
+    });
+
+    ipcRenderer.on('diff', (event: Event, data: { diff: string}) => {
+      this.props.dispatch({ type: 'UpdateSelectedFile', diff: data.diff });
     });
   }
 
@@ -45,6 +50,10 @@ class App extends React.Component<AppProps, AppState> {
     if (nextProps.name !== this.props.name || nextProps.branch !== this.props.branch) {
       document.title = nextProps.name ? `${nextProps.name} (${nextProps.branch || 'Branch does not exist yet'})` : 'Gitgud';
     }
+  }
+
+  updateStatus() {
+    ipcRenderer.send('status');
   }
 
   stageFile(file: FileStatus) {
@@ -55,9 +64,16 @@ class App extends React.Component<AppProps, AppState> {
     ipcRenderer.send('unstage', file);
   }
 
-  renderFileStatus(file: FileStatus, onClick: () => void) {
+  fileDiff(file: FileStatus, staged: boolean) {
+    ipcRenderer.send('diff', file, staged);
+  }
+
+  renderFileStatus(file: FileStatus, fileAction: () => void, selectFile: () => void) {
     return (
-      <li><button onClick={onClick}>{file.path}</button></li>
+      <li>
+        <label><input type="radio" name="selected" onClick={selectFile} value={file.path}/> {file.path}</label>
+        <button onClick={fileAction}>Stage/Unstage</button>
+      </li>
     );
   }
 
@@ -67,14 +83,16 @@ class App extends React.Component<AppProps, AppState> {
 
     return (
       <div>
+        <button onClick={() => this.updateStatus()}>Refresh</button>
         <h2>Unstaged</h2>
         <ul>
-          {unstagedFiles.map((file) => this.renderFileStatus(file, () => this.stageFile(file)))}
+          {unstagedFiles.map((file) => this.renderFileStatus(file, () => this.stageFile(file), () => this.fileDiff(file, false)))}
         </ul>
         <h2>Staged</h2>
         <ul>
-          {stagedFiles.map((file) => this.renderFileStatus(file, () => this.unstageFile(file)))}
+          {stagedFiles.map((file) => this.renderFileStatus(file, () => this.unstageFile(file), () => this.fileDiff(file, true)))}
         </ul>
+        <pre>{this.props.diff}</pre>
       </div>
     );
   }
@@ -85,6 +103,7 @@ const AppContainer = connect(App, (store: Store): AppStoreProps => {
     name: store.name || '',
     branch: store.branch || '',
     files: store.status.files,
+    diff: store.diff,
   };
 });
 

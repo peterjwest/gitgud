@@ -9,6 +9,7 @@ export interface Store {
   status: {
     files: FileStatus[];
   };
+  diff?: string;
 }
 
 export const defaultStore: Store = {
@@ -17,6 +18,7 @@ export const defaultStore: Store = {
   status: {
     files: [],
   },
+  diff: undefined,
 };
 
 export default (store = defaultStore, action: AppAction): Store => {
@@ -25,6 +27,9 @@ export default (store = defaultStore, action: AppAction): Store => {
   }
   if (action.type === 'UpdateStatusAction') {
     return { ...store, status: { ...store.status, files: action.files }};
+  }
+  if (action.type === 'UpdateSelectedFile') {
+    return { ...store, diff: action.diff };
   }
   return store;
 };
@@ -40,4 +45,9 @@ export interface UpdateStatusAction {
   files: FileStatus[];
 }
 
-export type AppAction = UpdateRepoAction | UpdateStatusAction;
+export interface UpdateSelectedFile {
+  type: 'UpdateSelectedFile';
+  diff: string;
+}
+
+export type AppAction = UpdateRepoAction | UpdateStatusAction | UpdateSelectedFile;
