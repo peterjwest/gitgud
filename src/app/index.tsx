@@ -48,31 +48,35 @@ class App extends React.Component<AppProps, AppState> {
 
   componentWillReceiveProps(nextProps: AppProps) {
     if (nextProps.name !== this.props.name || nextProps.branch !== this.props.branch) {
-      document.title = nextProps.name ? `${nextProps.name} (${nextProps.branch || 'Branch does not exist yet'})` : 'Gitgud';
+      document.title = this.getTitle(nextProps);
     }
+  }
+
+  getTitle(props: AppProps) {
+    return props.name ? `${props.name} (${props.branch || 'Branch does not exist yet'})` : 'Gitgud';
   }
 
   updateStatus() {
     ipcRenderer.send('status');
   }
 
-  stageFile(file: FileStatus) {
-    ipcRenderer.send('stage', file);
-  }
-
-  unstageFile(file: FileStatus) {
-    ipcRenderer.send('unstage', file);
+  toggleStageFile(file: FileStatus, stage: boolean) {
+    ipcRenderer.send(stage ? 'stage' : 'unstage', file);
   }
 
   fileDiff(file: FileStatus, staged: boolean) {
     ipcRenderer.send('diff', file, staged);
   }
 
-  renderFileStatus(file: FileStatus, fileAction: () => void, selectFile: () => void) {
+  renderFileStatus(file: FileStatus, isStaged: boolean) {
     return (
-      <li>
-        <label><input type="radio" name="selected" onClick={selectFile} value={file.path}/> {file.path}</label>
-        <button onClick={fileAction}>Stage/Unstage</button>
+      <li className={'App_stageView_pane_file'}>
+        <label className={'App_stageView_pane_file_select'}>
+          <input type="radio" name="selected" onClick={() => this.fileDiff(file, isStaged)} value={file.path}/> {file.path}
+        </label>
+        <button className={'App_stageView_pane_file_action'} onClick={() => this.toggleStageFile(file, !isStaged)}>
+          {isStaged ? 'Unstage' : 'Stage'}
+        </button>
       </li>
     );
   }
@@ -82,17 +86,25 @@ class App extends React.Component<AppProps, AppState> {
     const stagedFiles = this.props.files.filter((file) => file.status & IS_STAGED);
 
     return (
-      <div>
-        <button onClick={() => this.updateStatus()}>Refresh</button>
-        <h2>Unstaged</h2>
-        <ul>
-          {unstagedFiles.map((file) => this.renderFileStatus(file, () => this.stageFile(file), () => this.fileDiff(file, false)))}
-        </ul>
-        <h2>Staged</h2>
-        <ul>
-          {stagedFiles.map((file) => this.renderFileStatus(file, () => this.unstageFile(file), () => this.fileDiff(file, true)))}
-        </ul>
-        <pre>{this.props.diff}</pre>
+      <div className={'App'}>
+        <h1 className={'App_title'}>{this.getTitle(this.props)} <button onClick={() => this.updateStatus()}>Refresh</button></h1>
+        <div className={'App_stageView'}>
+          <div className={'App_stageView_pane App_stageView_pane-unstaged'}>
+            <h2 className={'App_stageView_pane_title'}>Unstaged changes</h2>
+            <ul className={'App_stageView_pane_content'}>
+              {unstagedFiles.map((file) => this.renderFileStatus(file, false))}
+            </ul>
+          </div>
+          <div className={'App_stageView_pane App_stageView_pane-staged'}>
+            <h2 className={'App_stageView_pane_title'}>Staged changes</h2>
+            <ul className={'App_stageView_pane_content'}>
+              {stagedFiles.map((file) => this.renderFileStatus(file, true))}
+            </ul>
+          </div>
+        </div>
+        <div className={'App_diffView'}>
+          <pre>{this.props.diff}</pre>
+        </div>
       </div>
     );
   }

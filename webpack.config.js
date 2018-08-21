@@ -1,5 +1,4 @@
 const path = require('path');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CleanWebpackPlugin = require('clean-webpack-plugin');
 const SassPlugin = require('sass-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
@@ -40,6 +39,10 @@ module.exports = [
       new CopyWebpackPlugin([{
         from: 'src/package.json.electron',
         to: 'package.json',
+      }]),
+      new CopyWebpackPlugin([{
+        from: 'src/app/index.html',
+        to: 'app/index.html',
       }]),
     ],
   },
@@ -100,13 +103,8 @@ module.exports = [
     plugins: [
       new SassPlugin('src/app/styles/index.scss', {
         sourceMap: true,
-        sass: {outputStyle: 'compressed'},
+        sass: { outputStyle: 'compressed' },
         autoprefixer: true
-      }),
-      new HtmlWebpackPlugin({
-        cssFile: '/index.css',
-        filename: 'index.html',
-        template: 'src/app/index.html',
       }),
     ],
   }
