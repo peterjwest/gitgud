@@ -126,6 +126,7 @@ function getWindow(path: string, windowClosed: (path: string) => void) {
     height: 768,
     minHeight: 480,
     minWidth: 640,
+    titleBarStyle: 'hidden',
   });
 
   const windowData: WindowData = {

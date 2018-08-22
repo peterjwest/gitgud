@@ -62,10 +62,19 @@ pre {
   display: flex;
   flex-direction: column;
 
-  &_title {
-    padding: 9px 11px;
-    margin-bottom: 5px;
-    border-bottom: 2px solid #1f1f1f;
+  &_titlebar {
+    padding-top: 22px;
+    -webkit-app-region: drag;
+
+    &_title {
+      padding: 3px 11px 9px;
+      margin-bottom: 5px;
+      border-bottom: 2px solid #1f1f1f;
+    }
+
+    &_refresh {
+      -webkit-app-region: no-drag;
+    }
   }
 
   &_stageView {
