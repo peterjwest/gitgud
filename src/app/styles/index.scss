@@ -125,5 +125,43 @@ pre {
     overflow: auto;
     margin: 5px;
     padding: 7px 10px;
+    font-family: monospace;
+
+    &_line {
+      display: flex;
+
+      &-addition {
+        background: rgba(#3c8b2f, 0.5);
+      }
+
+      &-removal {
+        background: rgba(#bc2424, 0.5);
+      }
+
+      &_number {
+        width: 40px;
+        margin-right: 10px;
+        padding-right: 10px;
+        flex-shrink: 0;
+        border-right: 1px solid rgba(255, 255, 255, 0.2);
+        text-align: right;
+
+        &::before {
+          content: attr(data-line-number);
+        }
+      }
+
+      &_type {
+        width: 20px;
+        flex-shrink: 0;
+
+        &::before {
+          content: attr(data-line-number);
+        }
+      }
+
+      &_text {
+      }
+    }
   }
 }

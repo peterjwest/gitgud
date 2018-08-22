@@ -7,6 +7,7 @@ import { createStore, applyMiddleware } from 'redux';
 import { Provider } from 'react-redux';
 import thunk from 'redux-thunk';
 import { Event } from 'electron';
+import $ from 'classnames';
 
 import reducer, { Store, FileStatus, AppAction } from './reducer';
 import { connect, ActionProps } from './connect';
@@ -18,6 +19,17 @@ const IS_STAGED = (
   nodegit.Status.STATUS.INDEX_RENAMED |
   nodegit.Status.STATUS.INDEX_TYPECHANGE
 );
+
+interface Hunk {
+  index: number;
+  lineNumbers: string[];
+}
+
+interface LineDiff {
+  type: '+' | '-' | ' ';
+  text: string;
+  lineNumbers: [number, number];
+}
 
 interface AppStoreProps {
   name: string;
@@ -81,13 +93,41 @@ class App extends React.Component<AppProps, AppState> {
     );
   }
 
+  renderHunk(lines: LineDiff[]) {
+    return (
+      <div>
+        <div className={'App_diffView_line'}>
+          <span className={'App_diffView_line_number'} data-line-number={'...'}/>
+          <span className={'App_diffView_line_number'} data-line-number={'...'}/>
+        </div>
+        {lines.map((line) => {
+          return <div className={$(
+            'App_diffView_line',
+            { 'App_diffView_line-addition': line.type === '+', 'App_diffView_line-removal': line.type === '-' },
+          )}>
+            <span className={'App_diffView_line_number'} data-line-number={line.type !== '+' ? line.lineNumbers[0] : ''}/>
+            <span className={'App_diffView_line_number'} data-line-number={line.type !== '-' ? line.lineNumbers[1] : ''}/>
+            <span className={'App_diffView_line_type'} data-line-number={line.type}/>
+            <pre className={'App_diffView_line_text'}>{line.text}</pre>
+          </div>;
+        })}
+      </div>
+    );
+  }
+
   render() {
     const unstagedFiles = this.props.files.filter((file) => file.status & ~IS_STAGED);
     const stagedFiles = this.props.files.filter((file) => file.status & IS_STAGED);
 
+    const hunks = parsePatch(this.props.diff || '');
+
     return (
       <div className={'App'}>
-        <h1 className={'App_title'}>{this.getTitle(this.props)} <button onClick={() => this.updateStatus()}>Refresh</button></h1>
+        <div className={'App_titlebar'}>
+          <h1 className={'App_titlebar_title'}>
+            {this.getTitle(this.props)} <button className={'App_titlebar_refresh'} onClick={() => this.updateStatus()}>Refresh</button>
+          </h1>
+        </div>
         <div className={'App_stageView'}>
           <div className={'App_stageView_pane App_stageView_pane-unstaged'}>
             <h2 className={'App_stageView_pane_title'}>Unstaged changes</h2>
@@ -103,7 +143,7 @@ class App extends React.Component<AppProps, AppState> {
           </div>
         </div>
         <div className={'App_diffView'}>
-          <pre>{this.props.diff}</pre>
+          {hunks.map((hunk) => this.renderHunk(hunk))}
         </div>
       </div>
     );
@@ -118,6 +158,42 @@ const AppContainer = connect(App, (store: Store): AppStoreProps => {
     diff: store.diff,
   };
 });
+
+function lookupKey<Keys extends string>(value: string, keys: Keys[], defaultKey: Keys) {
+  return keys.find((key) => key === value) || defaultKey;
+}
+
+// Takes a list of lines from a Git patch diff and returns a list of hunks with line indexes
+function parsePatchHunks(lines: string[]): Hunk[] {
+  return lines.map((line, index) => {
+    const match = line.match(/^@@ -(\d+),(\d+) \+(\d+),(\d+) @@/);
+    const lineNumbers = match ? match.slice(1, 5) : undefined;
+    return { index: index, lineNumbers: lineNumbers };
+  })
+  .filter((hunk): hunk is Hunk => Boolean(hunk.lineNumbers));
+}
+
+// Parses a Git patch diff and returns diff information per line, per hunk
+function parsePatch(patch: string): LineDiff[][] {
+  const lines = patch.split('\n');
+  return parsePatchHunks(lines)
+  .map((hunk, i, indexes) => {
+    const rangeStart = hunk.index + 1;
+    const rangeEnd = indexes[i + 1] ? indexes[i + 1].index : lines.length - 1;
+    const lineNumbers = [Number(hunk.lineNumbers[0]) - 1, Number(hunk.lineNumbers[2]) - 1];
+
+    return lines.slice(rangeStart, rangeEnd).map((line): LineDiff => {
+      const type = lookupKey(line[0], ['+', '-', ' '], ' ');
+      if (type !== '+') {
+        lineNumbers[0]++;
+      }
+      if (type !== '-') {
+        lineNumbers[1]++;
+      }
+      return { type: type, text: line.slice(1), lineNumbers: [lineNumbers[0], lineNumbers[1]] };
+    });
+  });
+}
 
 const appStore = createStore(reducer, applyMiddleware(thunk));
 const app = document.getElementById('app');
