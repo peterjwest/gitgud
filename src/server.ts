@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu, shell, dialog, webContents } from 'electron';
 import { ipcMain, Event } from 'electron';
 import * as defaultMenu from 'electron-default-menu';
 import * as nodegit from 'nodegit';
+import { exec } from 'child_process';
 
 function emptyTreeId() {
   return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
@@ -60,9 +61,9 @@ ipcMain.on('diff', async (event: Event, file: File, staged: boolean) => {
   if (!windowData || !windowData.repo) {
     throw new Error('Repository not loaded');
   }
-
+  const lineCount = await countFileLines(file.path);
   const diff = await getFileDiff(windowData.repo, file, staged);
-  event.sender.send('diff', { diff: diff });
+  event.sender.send('diff', { diff: diff, lineCount: lineCount });
 });
 
 ipcMain.on('status', async (event: Event, file: File) => {
@@ -164,6 +165,22 @@ function getWindow(path: string, windowClosed: (path: string) => void) {
 
   return windowData;
 }
+
+async function countFileLines(path: string) {
+  return new Promise<number>((resolve, reject) => {
+    exec(`wc -l "${path}"`, function (error, results) {
+      if (error) {
+        return reject(error);
+      }
+      const match = results.trim().match(/^(\d+)/);
+      if (!match) {
+        return reject(new Error('Results'));
+      }
+      resolve(Number(match[1]));
+    });
+  });
+}
+
 
 async function getFileDiff(repo: nodegit.Repository, file: File, staged: boolean) {
   const index = await repo.refreshIndex();
