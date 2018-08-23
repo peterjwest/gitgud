@@ -8,6 +8,7 @@ import { Provider } from 'react-redux';
 import thunk from 'redux-thunk';
 import { Event } from 'electron';
 import $ from 'classnames';
+import { last } from 'lodash';
 
 import reducer, { Store, FileStatus, AppAction } from './reducer';
 import { connect, ActionProps } from './connect';
@@ -36,6 +37,7 @@ interface AppStoreProps {
   branch: string;
   files: FileStatus[];
   diff?: string;
+  lineCount: number;
 }
 
 interface AppProps extends AppStoreProps, ActionProps<AppAction> {}
@@ -53,8 +55,8 @@ class App extends React.Component<AppProps, AppState> {
       this.props.dispatch({ type: 'UpdateStatusAction', files: data.files });
     });
 
-    ipcRenderer.on('diff', (event: Event, data: { diff: string}) => {
-      this.props.dispatch({ type: 'UpdateSelectedFile', diff: data.diff });
+    ipcRenderer.on('diff', (event: Event, data: { diff: string, lineCount: number }) => {
+      this.props.dispatch({ type: 'UpdateSelectedFile', diff: data.diff, lineCount: data.lineCount });
     });
   }
 
@@ -93,13 +95,15 @@ class App extends React.Component<AppProps, AppState> {
     );
   }
 
-  renderHunk(lines: LineDiff[]) {
+  renderHunk(lines: LineDiff[], lineCount: number) {
     return (
       <div>
-        <div className={'App_diffView_line'}>
-          <span className={'App_diffView_line_number'} data-line-number={'...'}/>
-          <span className={'App_diffView_line_number'} data-line-number={'...'}/>
-        </div>
+        {lines[0].lineNumbers[1] > 1 &&
+          <div className={'App_diffView_line'}>
+            <span className={'App_diffView_line_number'} data-line-number={'...'}/>
+            <span className={'App_diffView_line_number'} data-line-number={'...'}/>
+          </div>
+        }
         {lines.map((line) => {
           return <div className={$(
             'App_diffView_line',
@@ -120,6 +124,8 @@ class App extends React.Component<AppProps, AppState> {
     const stagedFiles = this.props.files.filter((file) => file.status & IS_STAGED);
 
     const hunks = parsePatch(this.props.diff || '');
+    const finalLine = last(hunks) && last(last(hunks));
+    console.log(finalLine, this.props.lineCount);
 
     return (
       <div className={'App'}>
@@ -143,7 +149,13 @@ class App extends React.Component<AppProps, AppState> {
           </div>
         </div>
         <div className={'App_diffView'}>
-          {hunks.map((hunk) => this.renderHunk(hunk))}
+          {hunks.map((hunk) => this.renderHunk(hunk, this.props.lineCount))}
+          {finalLine && finalLine.lineNumbers[1] < this.props.lineCount &&
+            <div className={'App_diffView_line'}>
+              <span className={'App_diffView_line_number'} data-line-number={'...'}/>
+              <span className={'App_diffView_line_number'} data-line-number={'...'}/>
+            </div>
+          }
         </div>
       </div>
     );
@@ -156,6 +168,7 @@ const AppContainer = connect(App, (store: Store): AppStoreProps => {
     branch: store.branch || '',
     files: store.status.files,
     diff: store.diff,
+    lineCount: store.lineCount,
   };
 });
 

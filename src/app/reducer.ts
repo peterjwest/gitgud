@@ -10,6 +10,7 @@ export interface Store {
     files: FileStatus[];
   };
   diff?: string;
+  lineCount: number;
 }
 
 export const defaultStore: Store = {
@@ -19,6 +20,7 @@ export const defaultStore: Store = {
     files: [],
   },
   diff: undefined,
+  lineCount: 0,
 };
 
 export default (store = defaultStore, action: AppAction): Store => {
@@ -29,7 +31,7 @@ export default (store = defaultStore, action: AppAction): Store => {
     return { ...store, status: { ...store.status, files: action.files }};
   }
   if (action.type === 'UpdateSelectedFile') {
-    return { ...store, diff: action.diff };
+    return { ...store, diff: action.diff, lineCount: action.lineCount };
   }
   return store;
 };
@@ -48,6 +50,7 @@ export interface UpdateStatusAction {
 export interface UpdateSelectedFile {
   type: 'UpdateSelectedFile';
   diff: string;
+  lineCount: number;
 }
 
 export type AppAction = UpdateRepoAction | UpdateStatusAction | UpdateSelectedFile;
