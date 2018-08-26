@@ -8,10 +8,10 @@ import { Provider } from 'react-redux';
 import thunk from 'redux-thunk';
 import { Event } from 'electron';
 import $ from 'classnames';
-import { last } from 'lodash';
 
 import reducer, { Store, FileStatus, AppAction } from './reducer';
 import { connect, ActionProps } from './connect';
+import { parsePatch, LineDiff, LineBreak } from '../git';
 
 const IS_STAGED = (
   nodegit.Status.STATUS.INDEX_NEW |
@@ -20,21 +20,6 @@ const IS_STAGED = (
   nodegit.Status.STATUS.INDEX_RENAMED |
   nodegit.Status.STATUS.INDEX_TYPECHANGE
 );
-
-interface Hunk {
-  index: number;
-  lineNumbers: string[];
-}
-
-interface LineDiff {
-  type: '+' | '-' | ' ';
-  text: string;
-  lineNumbers: [number, number];
-}
-
-interface LineBreak {
-  type: '.';
-}
 
 interface AppStoreProps {
   name: string;
@@ -128,16 +113,7 @@ class App extends React.Component<AppProps, AppState> {
   render() {
     const unstagedFiles = this.props.files.filter((file) => file.status & ~IS_STAGED);
     const stagedFiles = this.props.files.filter((file) => file.status & IS_STAGED);
-
-    const hunks = parsePatch(this.props.diff || '');
-    const finalLine = last(hunks) && last(last(hunks));
-
-    const lines = hunks.reduce((hunk: Array<LineDiff | LineBreak>, nextHunk) => {
-      return hunk
-      .concat(nextHunk[0].lineNumbers[1] > 1 ? [{ type: '.' }] : [])
-      .concat(nextHunk);
-    }, [])
-    .concat(finalLine && finalLine.lineNumbers[1] < this.props.lineCount ? [{ type: '.' }] : []);
+    const lines = parsePatch(this.props.diff || '', this.props.lineCount);
 
     return (
       <div className={'App'}>
@@ -163,7 +139,7 @@ class App extends React.Component<AppProps, AppState> {
         <div className={'App_diffView'}>
           <div className={'App_diffView_inner'}>
             {lines.map((line) => this.renderLine(line, this.props.lineCount))}
-            </div>
+          </div>
         </div>
       </div>
     );
@@ -179,42 +155,6 @@ const AppContainer = connect(App, (store: Store): AppStoreProps => {
     lineCount: store.lineCount,
   };
 });
-
-function lookupKey<Keys extends string>(value: string, keys: Keys[], defaultKey: Keys) {
-  return keys.find((key) => key === value) || defaultKey;
-}
-
-// Takes a list of lines from a Git patch diff and returns a list of hunks with line indexes
-function parsePatchHunks(lines: string[]): Hunk[] {
-  return lines.map((line, index) => {
-    const match = line.match(/^@@ -(\d+),(\d+) \+(\d+),(\d+) @@/);
-    const lineNumbers = match ? match.slice(1, 5) : undefined;
-    return { index: index, lineNumbers: lineNumbers };
-  })
-  .filter((hunk): hunk is Hunk => Boolean(hunk.lineNumbers));
-}
-
-// Parses a Git patch diff and returns diff information per line, per hunk
-function parsePatch(patch: string): LineDiff[][] {
-  const lines = patch.split('\n');
-  return parsePatchHunks(lines)
-  .map((hunk, i, indexes) => {
-    const rangeStart = hunk.index + 1;
-    const rangeEnd = indexes[i + 1] ? indexes[i + 1].index : lines.length - 1;
-    const lineNumbers = [Number(hunk.lineNumbers[0]) - 1, Number(hunk.lineNumbers[2]) - 1];
-
-    return lines.slice(rangeStart, rangeEnd).map((line): LineDiff => {
-      const type = lookupKey(line[0], ['+', '-', ' '], ' ');
-      if (type !== '+') {
-        lineNumbers[0]++;
-      }
-      if (type !== '-') {
-        lineNumbers[1]++;
-      }
-      return { type: type, text: line.slice(1), lineNumbers: [lineNumbers[0], lineNumbers[1]] };
-    });
-  });
-}
 
 const appStore = createStore(reducer, applyMiddleware(thunk));
 const app = document.getElementById('app');
