@@ -3,6 +3,7 @@ import { ipcMain, Event } from 'electron';
 import * as defaultMenu from 'electron-default-menu';
 import * as nodegit from 'nodegit';
 import { exec } from 'child_process';
+import * as path from 'path';
 
 function emptyTreeId() {
   return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
@@ -19,6 +20,8 @@ interface WindowData {
   repo?: nodegit.Repository;
 }
 
+const repoPaths = process.argv.slice(2);
+
 app.setName('Gitgud');
 
 app.on('window-all-closed', () => {
@@ -31,7 +34,12 @@ const windowsData: { [path: string]: WindowData} = {};
 const webContentsMap = new WeakMap<webContents, WindowData>();
 
 app.on('ready', () => {
-  createWindow(process.cwd());
+  if (repoPaths.length > 0) {
+    repoPaths.forEach((repoPath) => createWindow(path.resolve(repoPath)));
+  }
+  else {
+    createWindow(process.cwd());
+  }
 
   const menuTemplate = defaultMenu(app, shell);
   menuTemplate.splice(1, 0, {
