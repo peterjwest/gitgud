@@ -69,7 +69,7 @@ ipcMain.on('diff', async (event: Event, file: File, staged: boolean) => {
   if (!windowData || !windowData.repo) {
     throw new Error('Repository not loaded');
   }
-  const lineCount = await countFileLines(file.path);
+  const lineCount = await countFileLines(path.join(windowData.path, file.path));
   const diff = await getFileDiff(windowData.repo, file, staged);
   event.sender.send('diff', { diff: diff, lineCount: lineCount });
 });
