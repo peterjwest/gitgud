@@ -32,6 +32,10 @@ interface LineDiff {
   lineNumbers: [number, number];
 }
 
+interface LineBreak {
+  type: '.';
+}
+
 interface AppStoreProps {
   name: string;
   branch: string;
@@ -95,26 +99,28 @@ class App extends React.Component<AppProps, AppState> {
     );
   }
 
-  renderHunk(lines: LineDiff[], lineCount: number) {
+  renderLine(line: LineDiff | LineBreak, lineCount: number) {
+    if (line.type === '.') {
+      return (
+        <div className={'App_diffView_line'}>
+          <span className={'App_diffView_line_number'} data-line-number={'...'}/>
+          <span className={'App_diffView_line_number'} data-line-number={'...'}/>
+        </div>
+      );
+    }
+
     return (
-      <div>
-        {lines[0].lineNumbers[1] > 1 &&
-          <div className={'App_diffView_line'}>
-            <span className={'App_diffView_line_number'} data-line-number={'...'}/>
-            <span className={'App_diffView_line_number'} data-line-number={'...'}/>
-          </div>
-        }
-        {lines.map((line) => {
-          return <div className={$(
-            'App_diffView_line',
-            { 'App_diffView_line-addition': line.type === '+', 'App_diffView_line-removal': line.type === '-' },
-          )}>
-            <span className={'App_diffView_line_number'} data-line-number={line.type !== '+' ? line.lineNumbers[0] : ''}/>
-            <span className={'App_diffView_line_number'} data-line-number={line.type !== '-' ? line.lineNumbers[1] : ''}/>
-            <span className={'App_diffView_line_type'} data-line-number={line.type}/>
-            <pre className={'App_diffView_line_text'}>{line.text}</pre>
-          </div>;
-        })}
+      <div className={$(
+        'App_diffView_line',
+        {
+          'App_diffView_line-addition': line.type === '+',
+          'App_diffView_line-removal': line.type === '-',
+        },
+      )}>
+        <span className={'App_diffView_line_number'} data-line-number={line.type !== '+' ? line.lineNumbers[0] : ''}/>
+        <span className={'App_diffView_line_number'} data-line-number={line.type !== '-' ? line.lineNumbers[1] : ''}/>
+        <span className={'App_diffView_line_type'} data-line-number={line.type}/>
+        <pre className={'App_diffView_line_text'}>{line.text}</pre>
       </div>
     );
   }
@@ -125,7 +131,13 @@ class App extends React.Component<AppProps, AppState> {
 
     const hunks = parsePatch(this.props.diff || '');
     const finalLine = last(hunks) && last(last(hunks));
-    console.log(finalLine, this.props.lineCount);
+
+    const lines = hunks.reduce((hunk: Array<LineDiff | LineBreak>, nextHunk) => {
+      return hunk
+      .concat(nextHunk[0].lineNumbers[1] > 1 ? [{ type: '.' }] : [])
+      .concat(nextHunk);
+    }, [])
+    .concat(finalLine && finalLine.lineNumbers[1] < this.props.lineCount ? [{ type: '.' }] : []);
 
     return (
       <div className={'App'}>
@@ -149,13 +161,9 @@ class App extends React.Component<AppProps, AppState> {
           </div>
         </div>
         <div className={'App_diffView'}>
-          {hunks.map((hunk) => this.renderHunk(hunk, this.props.lineCount))}
-          {finalLine && finalLine.lineNumbers[1] < this.props.lineCount &&
-            <div className={'App_diffView_line'}>
-              <span className={'App_diffView_line_number'} data-line-number={'...'}/>
-              <span className={'App_diffView_line_number'} data-line-number={'...'}/>
+          <div className={'App_diffView_inner'}>
+            {lines.map((line) => this.renderLine(line, this.props.lineCount))}
             </div>
-          }
         </div>
       </div>
     );

@@ -67,7 +67,7 @@ pre {
     -webkit-app-region: drag;
 
     &_title {
-      padding: 3px 11px 9px;
+      padding: 3px 15px 9px;
       margin-bottom: 5px;
       border-bottom: 2px solid #1f1f1f;
     }
@@ -127,22 +127,28 @@ pre {
     padding: 7px 10px;
     font-family: monospace;
 
+    &_inner {
+      display: table;
+      min-width: 100%;
+    }
+
     &_line {
-      display: flex;
+      display: table-row;
+      height: 18px;
 
       &-addition {
-        background: rgba(#3c8b2f, 0.5);
+        color: #65c056;
+        background: rgba(#65c056, 0.1);
       }
 
       &-removal {
-        background: rgba(#bc2424, 0.5);
+        color: #ed6666;
+        background: rgba(#ed6666, 0.1);
       }
 
       &_number {
-        width: 40px;
-        margin-right: 10px;
-        padding-right: 10px;
-        flex-shrink: 0;
+        display: table-cell;
+        padding: 0 7px;
         border-right: 1px solid rgba(255, 255, 255, 0.2);
         text-align: right;
 
@@ -152,8 +158,8 @@ pre {
       }
 
       &_type {
-        width: 20px;
-        flex-shrink: 0;
+        display: table-cell;
+        padding: 0 5px;
 
         &::before {
           content: attr(data-line-number);
@@ -161,6 +167,7 @@ pre {
       }
 
       &_text {
+        display: table-cell;
       }
     }
   }
