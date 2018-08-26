@@ -47,7 +47,7 @@ app.on('ready', () => {
     submenu: [
       {
         label: 'Open...',
-        click: openRepo,
+        click: chooseRepo,
         accelerator: 'CmdOrCtrl+O',
       },
     ],
@@ -62,7 +62,6 @@ const untrackedFlags = (
   nodegit.Diff.OPTION.INCLUDE_UNTRACKED |
   nodegit.Diff.OPTION.RECURSE_UNTRACKED_DIRS
 );
-
 
 ipcMain.on('diff', async (event: Event, file: File, staged: boolean) => {
   const windowData = webContentsMap.get(event.sender);
@@ -115,20 +114,20 @@ ipcMain.on('unstage', async(event: Event, file: File) => {
   event.sender.send('status', { files: await getGitStatus(windowData.repo) });
 });
 
-function createWindow(path: string) {
-  if (windowsData[path]) {
-    windowsData[path].window.focus();
+function createWindow(repoPath: string) {
+  if (windowsData[repoPath]) {
+    windowsData[repoPath].window.focus();
   } else {
-    windowsData[path] = getWindow(path, removeWindow);
-    webContentsMap.set(windowsData[path].window.webContents, windowsData[path]);
+    windowsData[repoPath] = getWindow(repoPath, removeWindow);
+    webContentsMap.set(windowsData[repoPath].window.webContents, windowsData[repoPath]);
   }
 }
 
-function removeWindow(path: string) {
-  delete windowsData[path];
+function removeWindow(repoPath: string) {
+  delete windowsData[repoPath];
 }
 
-function getWindow(path: string, windowClosed: (path: string) => void) {
+function getWindow(repoPath: string, windowClosed: (repoPath: string) => void) {
   const window = new BrowserWindow({
     title: '',
     width: 1024,
@@ -139,16 +138,16 @@ function getWindow(path: string, windowClosed: (path: string) => void) {
   });
 
   const windowData: WindowData = {
-    path: path,
+    path: repoPath,
     window: window,
     repo: undefined,
   };
 
   window.webContents.on('did-finish-load', () => {
-    nodegit.Repository.open(path).then(async (repo) => {
+    nodegit.Repository.open(repoPath).then(async (repo) => {
       windowData.repo = repo;
       const currentBranch = await repo.getCurrentBranch();
-      window.webContents.send('init', { path: path, branch: currentBranch.shorthand() });
+      window.webContents.send('init', { path: repoPath, branch: currentBranch.shorthand() });
       window.webContents.send('status', { files: await getGitStatus(repo) });
     })
     .catch((error) => {
@@ -160,7 +159,7 @@ function getWindow(path: string, windowClosed: (path: string) => void) {
           { type: 'error', message: `${path} is not a valid Git repository` },
           () => {
             window.close();
-            windowClosed(path);
+            windowClosed(repoPath);
           },
         );
       }
@@ -169,14 +168,14 @@ function getWindow(path: string, windowClosed: (path: string) => void) {
 
   window.loadFile('app/index.html');
 
-  window.on('closed', () => windowClosed(path));
+  window.on('closed', () => windowClosed(repoPath));
 
   return windowData;
 }
 
-async function countFileLines(path: string) {
+async function countFileLines(filePath: string) {
   return new Promise<number>((resolve, reject) => {
-    exec(`wc -l "${path}"`, function (error, results) {
+    exec(`wc -l "${filePath}"`, function (error, results) {
       if (error) {
         return reject(error);
       }
@@ -206,13 +205,13 @@ async function getFileDiff(repo: nodegit.Repository, file: File, staged: boolean
 
 async function getGitStatus(repo: nodegit.Repository) {
   const files: File[] = [];
-  await nodegit.Status.foreach(repo, (path: string, status: number) => {
-    files.push({ path: path, status: status });
+  await nodegit.Status.foreach(repo, (filePath: string, status: number) => {
+    files.push({ path: filePath, status: status });
   });
   return files.filter((file) => file.status !== nodegit.Status.STATUS.IGNORED);
 }
 
-function openRepo() {
+function chooseRepo() {
   dialog.showOpenDialog({ properties: ['openDirectory'] }, (folders) => {
     if (folders) {
       createWindow(folders[0]);
