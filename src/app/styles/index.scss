@@ -41,7 +41,7 @@ h2 {
 button {
   font-size: 15px;
   padding: 5px 8px;
-  background: #3b416d;
+  background: #2c4277;
   color: #dedede;
   border: none;
 }
@@ -106,7 +106,11 @@ pre {
 
       &_file {
         display: flex;
-        margin-bottom: 1px;
+        border-bottom: 1px solid #1f1f1f;
+
+        &-selected {
+          background: #215692;
+        }
 
         &_select {
           flex-grow: 1;
@@ -114,7 +118,7 @@ pre {
         }
 
         &_action {
-          margin-right: 1px;
+          margin: 1px;
         }
       }
     }
@@ -123,9 +127,10 @@ pre {
   &_diffView {
     flex-grow: 1;
     overflow: auto;
-    margin: 5px;
+    margin: 6px;
     padding: 7px 10px;
     font-family: monospace;
+    background: #28282b;
 
     &_inner {
       display: table;

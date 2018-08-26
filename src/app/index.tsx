@@ -27,12 +27,30 @@ interface AppStoreProps {
   files: FileStatus[];
   diff?: string;
   lineCount: number;
+  selection: {
+    files: Set<string>;
+    staged: boolean;
+  };
 }
 
 interface AppProps extends AppStoreProps, ActionProps<AppAction> {}
 interface AppState {}
 
+interface ModifierKeys {
+  Meta: boolean;
+  Shift: boolean;
+  Control: boolean;
+  Alt: boolean;
+}
+
 class App extends React.Component<AppProps, AppState> {
+  keys: ModifierKeys = {
+    Meta: false,
+    Shift: false,
+    Control: false,
+    Alt: false,
+  };
+
   constructor(props: AppProps) {
     super(props);
 
@@ -45,8 +63,20 @@ class App extends React.Component<AppProps, AppState> {
     });
 
     ipcRenderer.on('diff', (event: Event, data: { diff: string, lineCount: number }) => {
-      this.props.dispatch({ type: 'UpdateSelectedFile', diff: data.diff, lineCount: data.lineCount });
+      this.props.dispatch({ type: 'UpdateFileDiff', diff: data.diff, lineCount: data.lineCount });
     });
+
+    window.addEventListener('keydown', (event) => {
+      if (this.keys.hasOwnProperty(event.key)) {
+        this.keys[event.key as keyof ModifierKeys] = true;
+      }
+    }, true);
+
+    window.addEventListener('keyup', (event) => {
+      if (this.keys.hasOwnProperty(event.key)) {
+        this.keys[event.key as keyof ModifierKeys] = false;
+      }
+    }, true);
   }
 
   componentWillReceiveProps(nextProps: AppProps) {
@@ -71,20 +101,49 @@ class App extends React.Component<AppProps, AppState> {
     ipcRenderer.send('diff', file, staged);
   }
 
-  renderFileStatus(file: FileStatus, isStaged: boolean) {
+  selectFile(file: FileStatus, staged: boolean) {
+    let files: string[] = [file.path];
+    if (this.props.selection.staged === staged && (this.keys.Meta || this.keys.Control)) {
+      const existing = new Set(this.props.selection.files);
+      if (existing.has(file.path)) {
+        existing.delete(file.path);
+      } else {
+        existing.add(file.path);
+      }
+      files = Array.from(existing);
+    }
+    this.props.dispatch({ type: 'UpdateSelectedFiles', files: files, staged: staged });
+    this.fileDiff(file, staged);
+  }
+
+  deselectFiles() {
+    this.props.dispatch({ type: 'UpdateSelectedFiles', files: [], staged: false });
+  }
+
+  renderFileStatus(file: FileStatus, staged: boolean) {
+    const selected = this.props.selection.staged === staged && this.props.selection.files.has(file.path);
     return (
-      <li className={'App_stageView_pane_file'}>
-        <label className={'App_stageView_pane_file_select'}>
-          <input type="radio" name="selected" onClick={() => this.fileDiff(file, isStaged)} value={file.path}/> {file.path}
+      <li
+        className={$('App_stageView_pane_file', { ['App_stageView_pane_file-selected']: selected })}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <label className={'App_stageView_pane_file_select'} >
+          <input
+            type="checkbox"
+            name="selected"
+            checked={selected}
+            onClick={() => this.selectFile(file, staged)}
+            value={file.path}
+          /> {file.path}
         </label>
-        <button className={'App_stageView_pane_file_action'} onClick={() => this.toggleStageFile(file, !isStaged)}>
-          {isStaged ? 'Unstage' : 'Stage'}
+        <button className={'App_stageView_pane_file_action'} onClick={() => this.toggleStageFile(file, !staged)}>
+          {staged ? 'Unstage' : 'Stage'}
         </button>
       </li>
     );
   }
 
-  renderLine(line: LineDiff | LineBreak, lineCount: number) {
+  renderLine(line: LineDiff | LineBreak) {
     if (line.type === '.') {
       return (
         <div className={'App_diffView_line'}>
@@ -125,20 +184,20 @@ class App extends React.Component<AppProps, AppState> {
         <div className={'App_stageView'}>
           <div className={'App_stageView_pane App_stageView_pane-unstaged'}>
             <h2 className={'App_stageView_pane_title'}>Unstaged changes</h2>
-            <ul className={'App_stageView_pane_content'}>
+            <ul className={'App_stageView_pane_content'} onClick={() => this.deselectFiles()}>
               {unstagedFiles.map((file) => this.renderFileStatus(file, false))}
             </ul>
           </div>
           <div className={'App_stageView_pane App_stageView_pane-staged'}>
             <h2 className={'App_stageView_pane_title'}>Staged changes</h2>
-            <ul className={'App_stageView_pane_content'}>
+            <ul className={'App_stageView_pane_content'} onClick={() => this.deselectFiles()}>
               {stagedFiles.map((file) => this.renderFileStatus(file, true))}
             </ul>
           </div>
         </div>
         <div className={'App_diffView'}>
           <div className={'App_diffView_inner'}>
-            {lines.map((line) => this.renderLine(line, this.props.lineCount))}
+            {lines.map((line) => this.renderLine(line))}
           </div>
         </div>
       </div>
@@ -153,6 +212,7 @@ const AppContainer = connect(App, (store: Store): AppStoreProps => {
     files: store.status.files,
     diff: store.diff,
     lineCount: store.lineCount,
+    selection: { files: new Set(store.selection.files), staged: store.selection.staged },
   };
 });
 
