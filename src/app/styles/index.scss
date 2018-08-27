@@ -81,6 +81,7 @@ pre {
     display: flex;
     height: calc(111px + 15%);
     flex-shrink: 0;
+    user-select: none;
 
     &_pane {
       $gap: 6px;
@@ -88,6 +89,7 @@ pre {
       flex-direction: column;
       width: calc(50% - #{$gap * 3 / 2});
       margin: 0 $gap;
+      padding-bottom: 12px;
 
       &:last-child {
         margin-left: 0px;
@@ -112,6 +114,10 @@ pre {
           background: #215692;
         }
 
+        &-drag {
+          background: #2f73be;
+        }
+
         &_select {
           flex-grow: 1;
           padding: 5px;
@@ -127,7 +133,7 @@ pre {
   &_diffView {
     flex-grow: 1;
     overflow: auto;
-    margin: 6px;
+    margin: 0 6px 6px 6px;
     padding: 7px 10px;
     font-family: monospace;
     background: #28282b;

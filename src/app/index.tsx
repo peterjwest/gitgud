@@ -8,10 +8,53 @@ import { Provider } from 'react-redux';
 import thunk from 'redux-thunk';
 import { Event } from 'electron';
 import $ from 'classnames';
+import { findIndex } from 'lodash';
 
 import reducer, { Store, FileStatus, AppAction } from './reducer';
 import { connect, ActionProps } from './connect';
 import { parsePatch, LineDiff, LineBreak } from '../git';
+
+// Finds the index of a vertical list item currently occupied by the mouse
+// Assumes that all list items are the same height
+function getMouseItemIndex(container: HTMLElement, mousePosition: number) {
+  const childCount = container.children.length;
+  if (childCount === 0) {
+    return -1;
+  }
+
+  const fileHeight = container.children[0].getBoundingClientRect().height;
+  const containerPosition = container.getBoundingClientRect();
+
+  if (mousePosition < containerPosition.top) {
+    return -1;
+  }
+  if (mousePosition > containerPosition.bottom) {
+    return childCount;
+  }
+
+  const index = Math.floor((mousePosition - containerPosition.top + container.scrollTop) / fileHeight);
+  return Math.max(Math.min(index, childCount), -1);
+}
+
+// Find all items within two index in an array (indexes can be outside the array range)
+function getRangeItems<Item>(items: Item[], range: { start: number, end: number }) {
+  if (range.start < 0 && range.end < 0) {
+    return [];
+  }
+  if (range.start >= items.length && range.end >= items.length) {
+    return [];
+  }
+  if (range.start < range.end) {
+    return items.slice(Math.max(0, range.start), range.end + 1);
+  } else {
+    return items.slice(Math.max(0, range.end), range.start + 1);
+  }
+}
+
+// Get from an array by index (index is bounded to nearest in the array)
+function getBoundedItem<Item>(items: Item[], index: number) {
+  return items[Math.max(Math.min(index, items.length - 1), 0)];
+}
 
 const IS_STAGED = (
   nodegit.Status.STATUS.INDEX_NEW |
@@ -24,7 +67,10 @@ const IS_STAGED = (
 interface AppStoreProps {
   name: string;
   branch: string;
-  files: FileStatus[];
+  files: {
+    unstaged: FileStatus[];
+    staged: FileStatus[];
+  };
   diff?: string;
   lineCount: number;
   selection: {
@@ -34,7 +80,14 @@ interface AppStoreProps {
 }
 
 interface AppProps extends AppStoreProps, ActionProps<AppAction> {}
-interface AppState {}
+interface AppState {
+  dragSelection?: {
+    range: {start: number, end: number};
+    staged: boolean;
+  };
+  lastSelected?: string;
+  modifiers: ModifierKeys;
+}
 
 interface ModifierKeys {
   Meta: boolean;
@@ -44,11 +97,15 @@ interface ModifierKeys {
 }
 
 class App extends React.Component<AppProps, AppState> {
-  keys: ModifierKeys = {
-    Meta: false,
-    Shift: false,
-    Control: false,
-    Alt: false,
+  unstagedElement?: HTMLUListElement;
+  stagedElement?: HTMLUListElement;
+  state: AppState = {
+    modifiers: {
+      Meta: false,
+      Shift: false,
+      Control: false,
+      Alt: false,
+    },
   };
 
   constructor(props: AppProps) {
@@ -67,14 +124,20 @@ class App extends React.Component<AppProps, AppState> {
     });
 
     window.addEventListener('keydown', (event) => {
-      if (this.keys.hasOwnProperty(event.key)) {
-        this.keys[event.key as keyof ModifierKeys] = true;
+      if (this.state.modifiers.hasOwnProperty(event.key)) {
+        const key = event.key as keyof ModifierKeys;
+        if (!this.state.modifiers[key]) {
+          this.setState({ modifiers: { ...this.state.modifiers, [key]: true }});
+        }
       }
     }, true);
 
     window.addEventListener('keyup', (event) => {
-      if (this.keys.hasOwnProperty(event.key)) {
-        this.keys[event.key as keyof ModifierKeys] = false;
+      if (this.state.modifiers.hasOwnProperty(event.key)) {
+        const key = event.key as keyof ModifierKeys;
+        if (this.state.modifiers[key]) {
+          this.setState({ modifiers: { ...this.state.modifiers, [key]: false }});
+        }
       }
     }, true);
   }
@@ -101,44 +164,123 @@ class App extends React.Component<AppProps, AppState> {
     ipcRenderer.send('diff', file, staged);
   }
 
-  selectFile(file: FileStatus, staged: boolean) {
-    let files: string[] = [file.path];
-    if (this.props.selection.staged === staged && (this.keys.Meta || this.keys.Control)) {
+  selectFiles(files: FileStatus[], range: { start: number, end: number }, staged: boolean) {
+    let selectedFiles = getRangeItems(files, range).map((file) => file.path);
+    if (this.props.selection.staged === staged && (this.state.modifiers.Meta || this.state.modifiers.Control || this.state.modifiers.Shift)) {
+      const existing = new Set(this.props.selection.files);
+
+      if (selectedFiles.length === 1 && this.state.modifiers.Shift) {
+        const shiftRange = {
+          start: this.state.lastSelected ? findIndex(files, (file) => file.path === this.state.lastSelected) : range.start,
+          end: range.end,
+        };
+        const shiftRangeFiles = getRangeItems(files, shiftRange).map((file) => file.path);
+        shiftRangeFiles.forEach((file) => existing.add(file));
+      } else if (selectedFiles.length === 1 && existing.has(selectedFiles[0])) {
+        existing.delete(selectedFiles[0]);
+      } else {
+        selectedFiles.forEach((file) => existing.add(file));
+      }
+      selectedFiles = Array.from(existing);
+    }
+    this.props.dispatch({ type: 'UpdateSelectedFiles', files: selectedFiles, staged: staged });
+    const lastSelected = getBoundedItem(files, range.end);
+    this.setState({ lastSelected: lastSelected ? lastSelected.path : undefined });
+    this.fileDiff(lastSelected, staged);
+  }
+
+  toggleFile(file: FileStatus, staged: boolean) {
+    let selectedFiles: string[];
+    if (this.props.selection.staged === staged) {
       const existing = new Set(this.props.selection.files);
       if (existing.has(file.path)) {
         existing.delete(file.path);
       } else {
         existing.add(file.path);
       }
-      files = Array.from(existing);
+      selectedFiles = Array.from(existing);
+    } else {
+      selectedFiles = [file.path];
     }
-    this.props.dispatch({ type: 'UpdateSelectedFiles', files: files, staged: staged });
+
+    this.props.dispatch({ type: 'UpdateSelectedFiles', files: selectedFiles, staged: staged });
+    this.setState({ lastSelected: file.path });
     this.fileDiff(file, staged);
   }
 
-  deselectFiles() {
-    this.props.dispatch({ type: 'UpdateSelectedFiles', files: [], staged: false });
+  startDrag(mousePosition: number, element: HTMLElement | undefined, staged: boolean) {
+    if (element) {
+      const index = getMouseItemIndex(element, mousePosition);
+      this.setState({ dragSelection: { range: { start: index, end: index }, staged: staged }});
+    }
   }
 
-  renderFileStatus(file: FileStatus, staged: boolean) {
+  moveDrag(mousePosition: number, element: HTMLElement | undefined, staged: boolean) {
+    const selection = this.state.dragSelection;
+    if (element && selection) {
+      const end = staged === selection.staged ? getMouseItemIndex(element, mousePosition) : selection.range.start;
+      this.setState({ dragSelection: { range: { ...selection.range, end: end }, staged: selection.staged }});
+    }
+  }
+
+  endDrag(mousePosition: number, element: HTMLElement | undefined, staged: boolean, files: FileStatus[]) {
+    const selection = this.state.dragSelection;
+    if (element && selection) {
+      if (staged === selection.staged) {
+        const end = getMouseItemIndex(element, mousePosition);
+        this.selectFiles(files, { ...selection.range, end: end }, staged);
+      }
+      this.setState({ dragSelection: undefined });
+    }
+  }
+
+  renderStagePane(staged: boolean, files: FileStatus[]) {
+    const elementName = staged ? 'stagedElement' : 'unstagedElement';
+    const dragSelection = this.state.dragSelection;
+    const draggedFiles = dragSelection && dragSelection.staged === staged ? getRangeItems(files, dragSelection.range) : [];
+    const draggedFileSet = new Set(draggedFiles.map((file) => file.path));
+    return (
+      <div
+        className={`App_stageView_pane App_stageView_pane-${staged ? 'staged' : 'unstaged'}`}
+        onMouseDown={(event) => this.startDrag(event.nativeEvent.clientY, this[elementName], staged)}
+        onMouseMove={(event) => this.moveDrag(event.nativeEvent.clientY, this[elementName], staged)}
+        onMouseUp={(event) => this.endDrag(event.nativeEvent.clientY, this[elementName], staged, files)}
+      >
+        <h2 className={'App_stageView_pane_title'}>{staged ? 'Staged' : 'Unstaged'} changes</h2>
+        <ul
+          className={'App_stageView_pane_content'}
+          ref={(element) => this[elementName] = element || undefined}
+        >
+          {files.map((file) => this.renderFileStatus(file, draggedFileSet, staged))}
+        </ul>
+      </div>
+    );
+  }
+
+  renderFileStatus(file: FileStatus, draggedFiles: Set<string>, staged: boolean) {
+    const dragSelected = draggedFiles.has(file.path);
     const selected = this.props.selection.staged === staged && this.props.selection.files.has(file.path);
+    const modifier = this.state.modifiers.Meta || this.state.modifiers.Control || this.state.modifiers.Shift;
     return (
       <li
-        className={$('App_stageView_pane_file', { ['App_stageView_pane_file-selected']: selected })}
-        onClick={(event) => event.stopPropagation()}
+        className={$(
+          'App_stageView_pane_file',
+          {
+            ['App_stageView_pane_file-selected']: selected,
+            ['App_stageView_pane_file-drag']: dragSelected || (selected && modifier),
+          },
+        )}
       >
-        <label className={'App_stageView_pane_file_select'} >
+        <div className={'App_stageView_pane_file_select'}>
           <input
             type="checkbox"
-            name="selected"
+            name="selected[]"
             checked={selected}
-            onClick={() => this.selectFile(file, staged)}
             value={file.path}
+            onMouseDown={(event) => event.stopPropagation()}
+            onChange={() => this.toggleFile(file, staged)}
           /> {file.path}
-        </label>
-        <button className={'App_stageView_pane_file_action'} onClick={() => this.toggleStageFile(file, !staged)}>
-          {staged ? 'Unstage' : 'Stage'}
-        </button>
+        </div>
       </li>
     );
   }
@@ -170,8 +312,6 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   render() {
-    const unstagedFiles = this.props.files.filter((file) => file.status & ~IS_STAGED);
-    const stagedFiles = this.props.files.filter((file) => file.status & IS_STAGED);
     const lines = parsePatch(this.props.diff || '', this.props.lineCount);
 
     return (
@@ -182,18 +322,8 @@ class App extends React.Component<AppProps, AppState> {
           </h1>
         </div>
         <div className={'App_stageView'}>
-          <div className={'App_stageView_pane App_stageView_pane-unstaged'}>
-            <h2 className={'App_stageView_pane_title'}>Unstaged changes</h2>
-            <ul className={'App_stageView_pane_content'} onClick={() => this.deselectFiles()}>
-              {unstagedFiles.map((file) => this.renderFileStatus(file, false))}
-            </ul>
-          </div>
-          <div className={'App_stageView_pane App_stageView_pane-staged'}>
-            <h2 className={'App_stageView_pane_title'}>Staged changes</h2>
-            <ul className={'App_stageView_pane_content'} onClick={() => this.deselectFiles()}>
-              {stagedFiles.map((file) => this.renderFileStatus(file, true))}
-            </ul>
-          </div>
+          {this.renderStagePane(false, this.props.files.unstaged)}
+          {this.renderStagePane(true, this.props.files.staged)}
         </div>
         <div className={'App_diffView'}>
           <div className={'App_diffView_inner'}>
@@ -209,7 +339,10 @@ const AppContainer = connect(App, (store: Store): AppStoreProps => {
   return {
     name: store.name || '',
     branch: store.branch || '',
-    files: store.status.files,
+    files: {
+      unstaged: store.status.files.filter((file) => file.status & ~IS_STAGED),
+      staged: store.status.files.filter((file) => file.status & IS_STAGED),
+    },
     diff: store.diff,
     lineCount: store.lineCount,
     selection: { files: new Set(store.selection.files), staged: store.selection.staged },
