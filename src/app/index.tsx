@@ -162,13 +162,17 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   stageSelection(toStage: boolean) {
-    const selection = this.props.selection;
-    if (toStage !== selection.staged) {
+    if (this.hasSelection(!toStage)) {
+      const selection = this.props.selection;
       const files = this.props.files[selection.staged ? 'staged' : 'unstaged'];
       const selectedFiles = files.filter((file) => selection.files.has(file.path));
       this.stageFiles(selectedFiles, toStage);
       this.props.dispatch({ type: 'UpdateSelectedFiles', files: Array.from(selection.files), staged: !selection.staged });
     }
+  }
+
+  hasSelection(isStaged: boolean) {
+    return this.props.selection.staged === isStaged && this.props.selection.files.size > 0;
   }
 
   fileDiff(file: FileStatus, staged: boolean) {
@@ -282,9 +286,9 @@ class App extends React.Component<AppProps, AppState> {
           <button
             type="submit"
             className={'App_stageView_pane_titlebar_action'}
+            disabled={!this.hasSelection(staged)}
             // Prevent activating the drag and drop
             onMouseDown={(event) => event.stopPropagation()}
-            onClick={() => this.stageFiles([], !staged)}
           >
             {staged ? 'Unstage' : 'Stage'}
           </button>

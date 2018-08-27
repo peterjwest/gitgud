@@ -44,6 +44,10 @@ button {
   background: #2c4277;
   color: #dedede;
   border: none;
+
+  &:disabled {
+    color: rgba(#dedede, 0.4);
+  }
 }
 
 ul {
