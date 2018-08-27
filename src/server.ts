@@ -68,12 +68,12 @@ ipcMain.on('diff', async (event: Event, file: File, staged: boolean) => {
   if (!windowData || !windowData.repo) {
     throw new Error('Repository not loaded');
   }
-  const lineCount = await countFileLines(path.join(windowData.path, file.path));
+  const lineCount = await countFileLines(path.join(windowData.path, file.path)).catch(() => -1);
   const diff = await getFileDiff(windowData.repo, file, staged);
   event.sender.send('diff', { diff: diff, lineCount: lineCount });
 });
 
-ipcMain.on('status', async (event: Event, file: File) => {
+ipcMain.on('status', async (event: Event) => {
   const windowData = webContentsMap.get(event.sender);
   if (!windowData || !windowData.repo) {
     throw new Error('Repository not loaded');
@@ -81,17 +81,19 @@ ipcMain.on('status', async (event: Event, file: File) => {
   event.sender.send('status', { files: await getGitStatus(windowData.repo) });
 });
 
-ipcMain.on('stage', async (event: Event, file: File) => {
+ipcMain.on('stage', async (event: Event, files: File[]) => {
   const windowData = webContentsMap.get(event.sender);
   if (!windowData || !windowData.repo) {
     throw new Error('Repository not loaded');
   }
   const index = await windowData.repo.refreshIndex();
 
-  if (file.status === nodegit.Status.STATUS.WT_DELETED) {
-    await index.removeByPath(file.path);
-  } else {
-    await index.addByPath(file.path);
+  for (const file of files) {
+    if (file.status === nodegit.Status.STATUS.WT_DELETED) {
+      await index.removeByPath(file.path);
+    } else {
+      await index.addByPath(file.path);
+    }
   }
 
   await (index.write() as any);
@@ -100,14 +102,16 @@ ipcMain.on('stage', async (event: Event, file: File) => {
   event.sender.send('status', { files: await getGitStatus(windowData.repo) });
 });
 
-ipcMain.on('unstage', async(event: Event, file: File) => {
+ipcMain.on('unstage', async(event: Event, files: File[]) => {
   const windowData = webContentsMap.get(event.sender);
   if (!windowData || !windowData.repo) {
     throw new Error('Repository not loaded');
   }
 
   const commit = await windowData.repo.getHeadCommit();
-  await nodegit.Reset.default(windowData.repo, commit as any, [file.path]);
+  for (const file of files) {
+    await nodegit.Reset.default(windowData.repo, commit as any, [file.path]);
+  }
   const index = await windowData.repo.refreshIndex();
   await index.writeTree();
 

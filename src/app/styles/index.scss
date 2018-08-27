@@ -95,9 +95,19 @@ pre {
         margin-left: 0px;
       }
 
-      &_title {
-        padding: 5px 7px;
-        margin: 0;
+      &_titlebar {
+        display: flex;
+        flex-shrink: 0;
+        margin-bottom: 5px;
+
+        &_title {
+          padding: 5px 7px;
+          margin: 0;
+          flex-grow: 1;
+        }
+
+        &_action {
+        }
       }
 
       &_content {
@@ -118,13 +128,13 @@ pre {
           background: #2f73be;
         }
 
+        &-transfer {
+          background: #255b37;
+        }
+
         &_select {
           flex-grow: 1;
           padding: 5px;
-        }
-
-        &_action {
-          margin: 1px;
         }
       }
     }

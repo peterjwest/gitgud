@@ -84,6 +84,7 @@ interface AppState {
   dragSelection?: {
     range: {start: number, end: number};
     staged: boolean;
+    transfer: boolean;
   };
   lastSelected?: string;
   modifiers: ModifierKeys;
@@ -156,17 +157,29 @@ class App extends React.Component<AppProps, AppState> {
     ipcRenderer.send('status');
   }
 
-  toggleStageFile(file: FileStatus, stage: boolean) {
-    ipcRenderer.send(stage ? 'stage' : 'unstage', file);
+  stageFiles(files: FileStatus[], toStage: boolean) {
+    ipcRenderer.send(toStage ? 'stage' : 'unstage', files);
+  }
+
+  stageSelection(toStage: boolean) {
+    const selection = this.props.selection;
+    if (toStage !== selection.staged) {
+      const files = this.props.files[selection.staged ? 'staged' : 'unstaged'];
+      const selectedFiles = files.filter((file) => selection.files.has(file.path));
+      this.stageFiles(selectedFiles, toStage);
+      this.props.dispatch({ type: 'UpdateSelectedFiles', files: Array.from(selection.files), staged: !selection.staged });
+    }
   }
 
   fileDiff(file: FileStatus, staged: boolean) {
     ipcRenderer.send('diff', file, staged);
   }
 
-  selectFiles(files: FileStatus[], range: { start: number, end: number }, staged: boolean) {
-    let selectedFiles = getRangeItems(files, range).map((file) => file.path);
-    if (this.props.selection.staged === staged && (this.state.modifiers.Meta || this.state.modifiers.Control || this.state.modifiers.Shift)) {
+  // TODO: Get this to return last item
+  getFilesFromRange(files: FileStatus[], range: { start: number, end: number }, staged: boolean, additiveOnly = false) {
+    const selectedFiles = getRangeItems(files, range).map((file) => file.path);
+    const modifierActive = this.state.modifiers.Meta || this.state.modifiers.Control || this.state.modifiers.Shift;
+    if (this.props.selection.staged === staged && (modifierActive || additiveOnly)) {
       const existing = new Set(this.props.selection.files);
 
       if (selectedFiles.length === 1 && this.state.modifiers.Shift) {
@@ -176,34 +189,36 @@ class App extends React.Component<AppProps, AppState> {
         };
         const shiftRangeFiles = getRangeItems(files, shiftRange).map((file) => file.path);
         shiftRangeFiles.forEach((file) => existing.add(file));
-      } else if (selectedFiles.length === 1 && existing.has(selectedFiles[0])) {
+      } else if (selectedFiles.length === 1 && existing.has(selectedFiles[0]) && !additiveOnly) {
         existing.delete(selectedFiles[0]);
       } else {
         selectedFiles.forEach((file) => existing.add(file));
       }
-      selectedFiles = Array.from(existing);
+      return Array.from(existing);
     }
+    return selectedFiles;
+  }
+
+  selectFiles(files: FileStatus[], range: { start: number, end: number }, staged: boolean) {
+    const selectedFiles = this.getFilesFromRange(files, range, staged);
     this.props.dispatch({ type: 'UpdateSelectedFiles', files: selectedFiles, staged: staged });
-    const lastSelected = getBoundedItem(files, range.end);
+
+    const lastSelected = selectedFiles.length > 0 ? getBoundedItem(files, range.end) : undefined;
     this.setState({ lastSelected: lastSelected ? lastSelected.path : undefined });
-    this.fileDiff(lastSelected, staged);
+    if (lastSelected) {
+      this.fileDiff(lastSelected, staged);
+    }
   }
 
   toggleFile(file: FileStatus, staged: boolean) {
-    let selectedFiles: string[];
-    if (this.props.selection.staged === staged) {
-      const existing = new Set(this.props.selection.files);
-      if (existing.has(file.path)) {
-        existing.delete(file.path);
-      } else {
-        existing.add(file.path);
-      }
-      selectedFiles = Array.from(existing);
+    const selectedFiles = new Set(this.props.selection.files);
+    if (selectedFiles.has(file.path)) {
+      selectedFiles.delete(file.path);
     } else {
-      selectedFiles = [file.path];
+      selectedFiles.add(file.path);
     }
 
-    this.props.dispatch({ type: 'UpdateSelectedFiles', files: selectedFiles, staged: staged });
+    this.props.dispatch({ type: 'UpdateSelectedFiles', files: Array.from(selectedFiles), staged: staged });
     this.setState({ lastSelected: file.path });
     this.fileDiff(file, staged);
   }
@@ -211,7 +226,7 @@ class App extends React.Component<AppProps, AppState> {
   startDrag(mousePosition: number, element: HTMLElement | undefined, staged: boolean) {
     if (element) {
       const index = getMouseItemIndex(element, mousePosition);
-      this.setState({ dragSelection: { range: { start: index, end: index }, staged: staged }});
+      this.setState({ dragSelection: { range: { start: index, end: index }, staged: staged, transfer: false }});
     }
   }
 
@@ -219,16 +234,27 @@ class App extends React.Component<AppProps, AppState> {
     const selection = this.state.dragSelection;
     if (element && selection) {
       const end = staged === selection.staged ? getMouseItemIndex(element, mousePosition) : selection.range.start;
-      this.setState({ dragSelection: { range: { ...selection.range, end: end }, staged: selection.staged }});
+      this.setState({ dragSelection: {
+        range: { ...selection.range, end: end },
+        staged: selection.staged,
+        transfer: staged !== selection.staged,
+      }});
     }
   }
 
-  endDrag(mousePosition: number, element: HTMLElement | undefined, staged: boolean, files: FileStatus[]) {
+  endDrag(toStage: boolean) {
     const selection = this.state.dragSelection;
-    if (element && selection) {
-      if (staged === selection.staged) {
-        const end = getMouseItemIndex(element, mousePosition);
-        this.selectFiles(files, { ...selection.range, end: end }, staged);
+    if (selection) {
+      const files = this.props.files[selection.staged ? 'staged' : 'unstaged'];
+      if (toStage === selection.staged) {
+        this.selectFiles(files, selection.range, toStage);
+      } else {
+        // TODO optimise set/array conversion
+        const transferRange = { start: selection.range.start, end: selection.range.start };
+        const selectedFilesSet = new Set(this.getFilesFromRange(files, transferRange, selection.staged, true));
+        const selectedFiles = files.filter((file) => selectedFilesSet.has(file.path));
+        this.stageFiles(selectedFiles, toStage);
+        this.props.dispatch({ type: 'UpdateSelectedFiles', files: Array.from(selectedFilesSet), staged: !selection.staged });
       }
       this.setState({ dragSelection: undefined });
     }
@@ -239,25 +265,41 @@ class App extends React.Component<AppProps, AppState> {
     const dragSelection = this.state.dragSelection;
     const draggedFiles = dragSelection && dragSelection.staged === staged ? getRangeItems(files, dragSelection.range) : [];
     const draggedFileSet = new Set(draggedFiles.map((file) => file.path));
+    const isTransfer = Boolean(dragSelection && dragSelection.transfer);
     return (
-      <div
+      <form
         className={`App_stageView_pane App_stageView_pane-${staged ? 'staged' : 'unstaged'}`}
         onMouseDown={(event) => this.startDrag(event.nativeEvent.clientY, this[elementName], staged)}
         onMouseMove={(event) => this.moveDrag(event.nativeEvent.clientY, this[elementName], staged)}
-        onMouseUp={(event) => this.endDrag(event.nativeEvent.clientY, this[elementName], staged, files)}
+        onMouseUp={(event) => this.endDrag(staged)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          this.stageSelection(!staged);
+        }}
       >
-        <h2 className={'App_stageView_pane_title'}>{staged ? 'Staged' : 'Unstaged'} changes</h2>
+        <div className={'App_stageView_pane_titlebar'}>
+          <h2 className={'App_stageView_pane_titlebar_title'}>{staged ? 'Staged' : 'Unstaged'} changes</h2>
+          <button
+            type="submit"
+            className={'App_stageView_pane_titlebar_action'}
+            // Prevent activating the drag and drop
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={() => this.stageFiles([], !staged)}
+          >
+            {staged ? 'Unstage' : 'Stage'}
+          </button>
+        </div>
         <ul
           className={'App_stageView_pane_content'}
           ref={(element) => this[elementName] = element || undefined}
         >
-          {files.map((file) => this.renderFileStatus(file, draggedFileSet, staged))}
+          {files.map((file) => this.renderFileStatus(file, draggedFileSet, staged, isTransfer))}
         </ul>
-      </div>
+      </form>
     );
   }
 
-  renderFileStatus(file: FileStatus, draggedFiles: Set<string>, staged: boolean) {
+  renderFileStatus(file: FileStatus, draggedFiles: Set<string>, staged: boolean, isTransfer: boolean) {
     const dragSelected = draggedFiles.has(file.path);
     const selected = this.props.selection.staged === staged && this.props.selection.files.has(file.path);
     const modifier = this.state.modifiers.Meta || this.state.modifiers.Control || this.state.modifiers.Shift;
@@ -268,6 +310,7 @@ class App extends React.Component<AppProps, AppState> {
           {
             ['App_stageView_pane_file-selected']: selected,
             ['App_stageView_pane_file-drag']: dragSelected || (selected && modifier),
+            ['App_stageView_pane_file-transfer']: (dragSelected || selected) && isTransfer,
           },
         )}
       >
@@ -277,6 +320,7 @@ class App extends React.Component<AppProps, AppState> {
             name="selected[]"
             checked={selected}
             value={file.path}
+            // Prevent activating the drag and drop
             onMouseDown={(event) => event.stopPropagation()}
             onChange={() => this.toggleFile(file, staged)}
           /> {file.path}
