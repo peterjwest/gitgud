@@ -1,5 +1,12 @@
 import * as nodegit from 'nodegit';
 
+export interface ModifierKeys {
+  Meta: boolean;
+  Shift: boolean;
+  Control: boolean;
+  Alt: boolean;
+}
+
 export const IS_STAGED = (
   nodegit.Status.STATUS.INDEX_NEW |
   nodegit.Status.STATUS.INDEX_MODIFIED |
