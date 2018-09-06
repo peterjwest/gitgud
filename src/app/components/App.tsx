@@ -2,19 +2,17 @@ import * as React from 'react';
 import { ipcRenderer } from 'electron';
 import * as path from 'path';
 import { Event } from 'electron';
-import $ from 'classnames';
 
 import { Store, FileStatus, AppAction } from '../reducer';
 import { connect, ActionProps } from '../connect';
-import { parsePatch, LineDiff, LineBreak } from '../../util/git';
 import { ModifierKeys } from '../../util/util';
 import StageView from './StageView';
+import DiffView from './DiffView';
 
 interface AppStoreProps {
   name: string;
   branch: string;
   diff?: string;
-  lineCount: number;
 }
 
 interface AppProps extends AppStoreProps, ActionProps<AppAction> {}
@@ -84,35 +82,7 @@ class App extends React.Component<AppProps, AppState> {
     ipcRenderer.send('diff', file, staged);
   }
 
-  renderLine(line: LineDiff | LineBreak) {
-    if (line.type === '.') {
-      return (
-        <div className={'App_diffView_line'}>
-          <span className={'App_diffView_line_number'} data-line-number={'...'}/>
-          <span className={'App_diffView_line_number'} data-line-number={'...'}/>
-        </div>
-      );
-    }
-
-    return (
-      <div className={$(
-        'App_diffView_line',
-        {
-          'App_diffView_line-addition': line.type === '+',
-          'App_diffView_line-removal': line.type === '-',
-        },
-      )}>
-        <span className={'App_diffView_line_number'} data-line-number={line.type !== '+' ? line.lineNumbers[0] : ''}/>
-        <span className={'App_diffView_line_number'} data-line-number={line.type !== '-' ? line.lineNumbers[1] : ''}/>
-        <span className={'App_diffView_line_type'} data-line-number={line.type}/>
-        <pre className={'App_diffView_line_text'}>{line.text}</pre>
-      </div>
-    );
-  }
-
   render() {
-    const lines = parsePatch(this.props.diff || '', this.props.lineCount);
-
     return (
       <div className={'App'}>
         <div className={'App_titlebar'}>
@@ -121,11 +91,7 @@ class App extends React.Component<AppProps, AppState> {
           </h1>
         </div>
         <StageView modifiers={this.state.modifiers} selectDiffFile={this.selectDiffFile.bind(this)}/>
-        <div className={'App_diffView'}>
-          <div className={'App_diffView_inner'}>
-            {lines.map((line) => this.renderLine(line))}
-          </div>
-        </div>
+        <DiffView/>
       </div>
     );
   }
@@ -135,8 +101,6 @@ const AppContainer = connect(App, (store: Store): AppStoreProps => {
   return {
     name: store.name || '',
     branch: store.branch || '',
-    diff: store.diff,
-    lineCount: store.lineCount,
   };
 });
 
