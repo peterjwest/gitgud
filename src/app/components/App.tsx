@@ -78,10 +78,6 @@ class App extends React.Component<AppProps, AppState> {
     ipcRenderer.send('status');
   }
 
-  selectDiffFile(file: FileStatus, staged: boolean) {
-    ipcRenderer.send('diff', file, staged);
-  }
-
   render() {
     return (
       <div className={'App'}>
@@ -90,7 +86,7 @@ class App extends React.Component<AppProps, AppState> {
             {this.getTitle(this.props)} <button className={'App_titlebar_refresh'} onClick={() => this.updateStatus()}>Refresh</button>
           </h1>
         </div>
-        <StageView modifiers={this.state.modifiers} selectDiffFile={this.selectDiffFile.bind(this)}/>
+        <StageView modifiers={this.state.modifiers}/>
         <DiffView/>
       </div>
     );

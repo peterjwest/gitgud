@@ -20,7 +20,6 @@ interface StageViewStoreProps {
 
 interface StageViewOwnProps {
   modifiers: ModifierKeys;
-  selectDiffFile(file: FileStatus, staged: boolean): void;
 }
 
 interface StageViewState {
@@ -36,6 +35,10 @@ class StageView extends React.Component<StageViewStoreProps & ActionProps<AppAct
   unstagedElement?: HTMLUListElement;
   stagedElement?: HTMLUListElement;
   state: StageViewState = {};
+
+  selectDiffFile(file: FileStatus, staged: boolean) {
+    ipcRenderer.send('diff', file, staged);
+  }
 
   // TODO: Get this to return last item
   getFilesFromRange(files: FileStatus[], range: { start: number, end: number }, staged: boolean, additiveOnly = false) {
@@ -86,7 +89,7 @@ class StageView extends React.Component<StageViewStoreProps & ActionProps<AppAct
     const lastSelected = selectedFiles.length > 0 ? getBoundedItem(files, range.end) : undefined;
     this.setState({ lastSelected: lastSelected ? lastSelected.path : undefined });
     if (lastSelected) {
-      this.props.selectDiffFile(lastSelected, staged);
+      this.selectDiffFile(lastSelected, staged);
     }
   }
 
@@ -100,7 +103,7 @@ class StageView extends React.Component<StageViewStoreProps & ActionProps<AppAct
 
     this.props.dispatch({ type: 'UpdateSelectedFiles', files: Array.from(selectedFiles), staged: staged });
     this.setState({ lastSelected: file.path });
-    this.props.selectDiffFile(file, staged);
+    this.selectDiffFile(file, staged);
   }
 
   startDrag(mousePosition: number, element: HTMLElement | undefined, staged: boolean) {
