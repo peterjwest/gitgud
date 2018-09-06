@@ -4,13 +4,16 @@ import $ from 'classnames';
 import { Store, AppAction } from '../reducer';
 import { connect, ActionProps } from '../connect';
 import { parsePatch, LineDiff, LineBreak } from '../../util/git';
+import { ModifierKeys } from '../../util/util';
 
 interface DiffViewStoreProps {
   diff?: string;
   lineCount: number;
 }
 
-interface DiffViewOwnProps {}
+interface DiffViewOwnProps {
+  modifiers: ModifierKeys;
+}
 interface DiffViewState {}
 
 class DiffView extends React.Component<DiffViewStoreProps & ActionProps<AppAction> & DiffViewOwnProps, DiffViewState> {

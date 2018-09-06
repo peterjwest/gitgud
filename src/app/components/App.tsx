@@ -87,7 +87,7 @@ class App extends React.Component<AppProps, AppState> {
           </h1>
         </div>
         <StageView modifiers={this.state.modifiers}/>
-        <DiffView/>
+        <DiffView modifiers={this.state.modifiers}/>
       </div>
     );
   }
