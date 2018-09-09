@@ -9,6 +9,7 @@ import { ModifierKeys } from '../../util/util';
 interface DiffViewStoreProps {
   diff?: string;
   lineCount: number;
+  selectedLines: Set<string>;
 }
 
 interface DiffViewOwnProps {
@@ -62,6 +63,7 @@ const DiffViewContainer: React.ComponentClass<DiffViewOwnProps> = connect(DiffVi
   return {
     diff: store.diff,
     lineCount: store.lineCount,
+    selectedLines: new Set(store.lineSelection.lines),
   };
 });
 

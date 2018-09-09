@@ -9,9 +9,12 @@ export interface Store {
   status: {
     files: FileStatus[];
   };
-  selection: {
+  fileSelection: {
     files: string[];
     staged: boolean;
+  };
+  lineSelection: {
+    lines: string[];
   };
   diff?: string;
   lineCount: number;
@@ -23,9 +26,12 @@ export const defaultStore: Store = {
   status: {
     files: [],
   },
-  selection: {
+  fileSelection: {
     files: [],
     staged: false,
+  },
+  lineSelection: {
+    lines: [],
   },
   diff: undefined,
   lineCount: 0,
@@ -42,7 +48,10 @@ export default (store = defaultStore, action: AppAction): Store => {
     return { ...store, diff: action.diff, lineCount: action.lineCount };
   }
   if (action.type === 'UpdateSelectedFiles') {
-    return { ...store, selection: { files: action.files, staged: action.staged }};
+    return { ...store, fileSelection: { files: action.files, staged: action.staged }};
+  }
+  if (action.type === 'UpdateSelectedLines') {
+    return { ...store, lineSelection: { lines: action.lines }};
   }
   return store;
 };
@@ -69,4 +78,9 @@ export interface UpdateSelectedFiles {
   staged: boolean;
 }
 
-export type AppAction = UpdateRepoAction | UpdateStatusAction | UpdateFileDiff | UpdateSelectedFiles;
+export interface UpdateSelectedLines {
+  type: 'UpdateSelectedLines';
+  lines: string[];
+}
+
+export type AppAction = UpdateRepoAction | UpdateStatusAction | UpdateFileDiff | UpdateSelectedFiles | UpdateSelectedLines;

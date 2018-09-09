@@ -229,7 +229,7 @@ const StageViewContainer: React.ComponentClass<StageViewOwnProps> = connect(Stag
       unstaged: store.status.files.filter((file) => file.status & ~IS_STAGED),
       staged: store.status.files.filter((file) => file.status & IS_STAGED),
     },
-    selection: { files: new Set(store.selection.files), staged: store.selection.staged },
+    selection: { files: new Set(store.fileSelection.files), staged: store.fileSelection.staged },
   };
 });
 
