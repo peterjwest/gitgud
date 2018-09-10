@@ -158,9 +158,9 @@ class StageView extends React.Component<StageViewStoreProps & ActionProps<AppAct
         className={$(
           'App_stageView_pane_file',
           {
-            ['App_stageView_pane_file-selected']: selected,
-            ['App_stageView_pane_file-drag']: dragSelected || (selected && modifier),
-            ['App_stageView_pane_file-transfer']: (dragSelected || selected) && isTransfer,
+            'App_stageView_pane_file-selected': selected,
+            'App_stageView_pane_file-drag': dragSelected || (selected && modifier),
+            'App_stageView_pane_file-transfer': (dragSelected || selected) && isTransfer,
           },
         )}
       >
@@ -209,10 +209,7 @@ class StageView extends React.Component<StageViewStoreProps & ActionProps<AppAct
             {staged ? 'Unstage' : 'Stage'}
           </button>
         </div>
-        <ul
-          className={'App_stageView_pane_content'}
-          ref={(element) => this[elementName] = element || undefined}
-        >
+        <ul className={'App_stageView_pane_content'} ref={(element) => this[elementName] = element || undefined}>
           {files.map((file) => this.renderFileStatus(file, draggedFileSet, staged, isTransfer))}
         </ul>
       </form>
