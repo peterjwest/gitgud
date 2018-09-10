@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { ipcRenderer } from 'electron';
-import { findIndex } from 'lodash';
 import $ from 'classnames';
+import { findIndex } from 'lodash';
 
 import { Store, FileStatus, AppAction } from '../reducer';
 import { connect, ActionProps } from '../connect';
-import { getMouseItemIndex, getRangeItems, getBoundedItem, IS_STAGED, ModifierKeys } from '../../util/util';
+import { getMouseItemIndex, getRangeItems, IS_STAGED, ModifierKeys } from '../../util/util';
 
 interface StageViewStoreProps {
   files: {
@@ -28,7 +28,12 @@ interface StageViewState {
     staged: boolean;
     transfer: boolean;
   };
-  lastSelected?: string;
+  lastSelected?: FileStatus;
+}
+
+function lookupFileIndex(files: FileStatus[], target: FileStatus | undefined) {
+  const index = target ? findIndex(files, (file) => Boolean(file.path === target.path)) : -1;
+  return index >= 0 ? index : undefined;
 }
 
 class StageView extends React.Component<StageViewStoreProps & ActionProps<AppAction> & StageViewOwnProps, StageViewState> {
@@ -40,28 +45,30 @@ class StageView extends React.Component<StageViewStoreProps & ActionProps<AppAct
     ipcRenderer.send('diff', file, staged);
   }
 
-  // TODO: Get this to return last item
   getFilesFromRange(files: FileStatus[], range: { start: number, end: number }, staged: boolean, additiveOnly = false) {
     const selectedFiles = getRangeItems(files, range).map((file) => file.path);
     const modifierActive = this.props.modifiers.Meta || this.props.modifiers.Control || this.props.modifiers.Shift;
+    let lastSelected: FileStatus | undefined = files[range.end];
     if (this.props.selection.staged === staged && (modifierActive || additiveOnly)) {
       const existing = new Set(this.props.selection.files);
 
       if (selectedFiles.length === 1 && this.props.modifiers.Shift) {
         const shiftRange = {
-          start: this.state.lastSelected ? findIndex(files, (file) => file.path === this.state.lastSelected) : range.start,
+          start: lookupFileIndex(files, this.state.lastSelected) || range.start,
           end: range.end,
         };
         const shiftRangeFiles = getRangeItems(files, shiftRange).map((file) => file.path);
         shiftRangeFiles.forEach((file) => existing.add(file));
+        lastSelected = files[shiftRange.end];
       } else if (selectedFiles.length === 1 && existing.has(selectedFiles[0]) && !additiveOnly) {
         existing.delete(selectedFiles[0]);
+        lastSelected = undefined;
       } else {
         selectedFiles.forEach((file) => existing.add(file));
       }
-      return Array.from(existing);
+      return { selection: Array.from(existing), lastSelected: lastSelected };
     }
-    return selectedFiles;
+    return { selection: selectedFiles, lastSelected: lastSelected };
   }
 
   stageFiles(files: FileStatus[], toStage: boolean) {
@@ -83,11 +90,10 @@ class StageView extends React.Component<StageViewStoreProps & ActionProps<AppAct
   }
 
   selectFiles(files: FileStatus[], range: { start: number, end: number }, staged: boolean) {
-    const selectedFiles = this.getFilesFromRange(files, range, staged);
-    this.props.dispatch({ type: 'UpdateSelectedFiles', files: selectedFiles, staged: staged });
+    const { selection, lastSelected } = this.getFilesFromRange(files, range, staged);
+    this.props.dispatch({ type: 'UpdateSelectedFiles', files: selection, staged: staged });
 
-    const lastSelected = selectedFiles.length > 0 ? getBoundedItem(files, range.end) : undefined;
-    this.setState({ lastSelected: lastSelected ? lastSelected.path : undefined });
+    this.setState({ lastSelected: lastSelected });
     if (lastSelected) {
       this.selectDiffFile(lastSelected, staged);
     }
@@ -102,7 +108,7 @@ class StageView extends React.Component<StageViewStoreProps & ActionProps<AppAct
     }
 
     this.props.dispatch({ type: 'UpdateSelectedFiles', files: Array.from(selectedFiles), staged: staged });
-    this.setState({ lastSelected: file.path });
+    this.setState({ lastSelected: file });
     this.selectDiffFile(file, staged);
   }
 
@@ -134,7 +140,7 @@ class StageView extends React.Component<StageViewStoreProps & ActionProps<AppAct
       } else {
         // TODO optimise set/array conversion
         const transferRange = { start: selection.range.start, end: selection.range.start };
-        const selectedFilesSet = new Set(this.getFilesFromRange(files, transferRange, selection.staged, true));
+        const selectedFilesSet = new Set(this.getFilesFromRange(files, transferRange, selection.staged, true).selection);
         const selectedFiles = files.filter((file) => selectedFilesSet.has(file.path));
         this.stageFiles(selectedFiles, toStage);
         this.props.dispatch({ type: 'UpdateSelectedFiles', files: Array.from(selectedFilesSet), staged: !selection.staged });
