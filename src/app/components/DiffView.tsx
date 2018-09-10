@@ -58,7 +58,7 @@ class DiffView extends React.Component<DiffViewStoreProps & ActionProps<AppActio
     if (modifierActive) {
       const existing = new Set(this.props.selectedLines);
 
-      if (selectedLines.length === 1 && this.props.modifiers.Shift) {
+      if (selectedLines.length <= 1 && this.props.modifiers.Shift) {
         const shiftRange = {
           start: lookupLineIndex(this.props.lines, this.state.lastSelected) || range.start,
           end: range.end,
