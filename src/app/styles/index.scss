@@ -123,6 +123,7 @@ pre {
       &_file {
         display: flex;
         border-bottom: 1px solid #1f1f1f;
+        cursor: pointer;
 
         &-selected {
           background: #215692;
@@ -151,6 +152,7 @@ pre {
     padding: 7px 10px;
     font-family: monospace;
     background: #28282b;
+    user-select: none;
 
     &_inner {
       display: table;
@@ -159,7 +161,12 @@ pre {
 
     &_line {
       display: table-row;
-      height: 18px;
+      height: 20px;
+      cursor: pointer;
+
+      &-ellipsis {
+        cursor: default;
+      }
 
       &-addition {
         color: #65c056;
@@ -169,6 +176,18 @@ pre {
       &-removal {
         color: #ed6666;
         background: rgba(#ed6666, 0.1);
+      }
+
+      &-selected {
+        background: #215692;
+      }
+
+      &-drag {
+        background: #2f73be;
+      }
+
+      &_checkbox {
+        display: table-cell;
       }
 
       &_number {

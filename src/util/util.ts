@@ -51,8 +51,3 @@ export function getRangeItems<Item>(items: Item[], range: { start: number, end: 
     return items.slice(Math.max(0, range.end), range.start + 1);
   }
 }
-
-// Get from an array by index (index is bounded to nearest in the array)
-export function getBoundedItem<Item>(items: Item[], index: number) {
-  return items[Math.max(Math.min(index, items.length - 1), 0)];
-}
