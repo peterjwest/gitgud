@@ -35,7 +35,7 @@
     "classnames": "2.2.6",
     "electron": "2.0.7",
     "electron-default-menu": "1.0.1",
-    "lodash": "4.17.10",
+    "lodash": "4.17.16",
     "nodegit": "0.22.2",
     "react": "16.4.2",
     "react-dom": "16.4.2",
